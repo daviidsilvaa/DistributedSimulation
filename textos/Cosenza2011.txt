@@ -1,0 +1,36 @@
+Simular grupos de agentes eh assunto desde os anos 80. As simulacoes eram baseadas em particulas que moviam de acordo com parametros fisicos que atuavam sobre elas (forca motriz, forca gravitacional, atrito, etc). Contudo, simular particulas unitariamente nao resultava em informacoes relevantes. Entao, as simulacoes foram expandidas para grupos de particulas, pois entender os grupos a olho nu era completamente complicado e so tornou-se possivel com o auxilio de simulacoes feitas em computadores. Os grupos eram compostos por entidades complexas, chamados de agentes autonomos, os quais agiam pelas interacoes sociais e fisicas feitas pelos agentes do mesmo grupo.
+
+Exemplo dado eh o modelo bandos de passaros (Reynolds, 1987). Os elementos dos bandos sao os passaros, que atraves de comportamentos sao induzidos a algum tipo de personalidade (voar junto ao bando, mover de um bando para outros, etc). Sao tres os comportamentos: separacao de outros passaros, alinhamento a direcao de voo de outros passaros e coesao a outros passaros. A simulacao do modelo eh feita por passos, onde a cada passo eh calculado o comportamento de cada passaro e definida a sua trajetoria pela soma dos pesos das forcas aplicadas sobre ele. 
+
+A escolha do modelo flock boids eh proposital, pois sua complexidade computacional O(n^2) (n o numero de agentes na simulacao) o impede de ser simulado em tempo habil utiizando computacao sequencial. Uma solucao foi distribuir os calculos entre mais computadores, balanceando a carga distribuida e minimizando a sobrecarga de comunicacao devido as tarefas interdependentes.
+
+O autor do artigo simulou distribuidamente o modelo baseado nos agentes, diferente de outras implementacoes que baseam no espaco. Cada processo mantem uma porcao do espaco simulado, que eh designado pela densidade populacional dos agentes, ou seja, processos simulam porcoes diferentes do espaco. A justificativa esta nos agentes, principais responsaveis pela carga gerada durante a simulacao. Logo, eh mais inteligente dividir o espaco heterogeneamente e manter quantidades semelhantes/proximas de agentes em cada processo. 
+
+O bom particionamento eh essencial, pois o tempo de simulacao eh determinado pelo tempo do processo mais lento. Os passos da simulacao devem estar sincronizados de um processo para outro, como se os processos avancassem em paralelo. Sincronizar eh importante para manter a corretude da simulacao, ou seja, evitar que informacoes antigas sejam utilizadas para calculos.
+
+A simulacao em si eh feita num espaco tridimensional. Contudo, o particionamento do espaco ocorre unidimensionalmente. O espaco pode ser visto como um histograma, onde o valor correspondente a posicao eh a quantidade de agentes presentes na porcao do espaco dentro escala representada pelo histograma. 
+
+Cada agente interage com outros agentes proximos a ele, numa distancia menor que um raio r. O raio influencia em todo passo da simulacao. Nenhum agente movimenta mais que o menor raio dentro do mesmo espaco de tempo, e o raio sempre sera suficientemente capaz de assegurar que um agente nao mova pra regiao diferente a representada pelo processo atual em que esta. Sempre que um agente se aproxima a uma regiao diferente a que esta no processo, eh feito o reparticionamento do espaco e balanceamento da carga. A mudanca de agentes de uma regiao para outra altera a densidade histogramica e justifica o balanceamento em tempo de simulacao.
+
+Os processos, alem de armazenarem uma regiao S do espaco, eles armazenam informacoes referentes as regioes vizinhas, armazenadas por outros processos. Isso gera uma intersecao E de areas entre processos (lateralmente, E possui 2r de comprimento)
+
+|---------------------------------| -> Espaco
+|---------|--El--|--Er--|---------| -> Intersecao
+|-----------Sl----------|				-> Regiao armazenada pelo processo l
+			 |------------Sr---------| -> Regiao armazenada pelo processo r
+
+el eh a quantidade de agentes em El
+er eh a quantidade de agentes em Er
+sl eh a quantidade de agentes em Sl
+sr eh a quantidade de agentes em Sr
+
+Os objetivos do algoritmo de balanceamento eh:
+	1. minimizar o desbalanceamento, isto eh, |sl - sr|
+	2. minimizar a comunicacao sincronizativa, isto eh, |el + er|
+	
+Particionamento estatico
+A regiao principal de tamnho dx eh particionado em regioes menores de tamanho dx/w, onde w eh o numero de processos, e atribuidas a cada processo. O particionamento eh estatico e nao se altera durante a simulacao. A movimentacao dos agentes ocasionara em desbalanceamento da carga entre os processos e aumentara o tempo de simulacao.
+
+Balanceamento dinamico 1
+Cada passo da simulacao recebe um valor que indicara qual balanceamento deve ser feito. O valor eh dado para os limites entre as subregioes, calculada pela area e agentes armazenados por cada processo. O desbalancemanto acusado pelo valor atribuido ao passo conduz ao novo particionamento. Valores positivos e negativos podem ser atribuidos ao passo. Como o espaco eh visto unidimensionalmente pela simulacao, valores positivos conduzem ah um novo corte mais a esquerda da regiao inicial, e valores negativos pro lado contrario. Assim, sempre que agentes movem para outros processos, os cortes sobre a regiao sao refeitos e a carga eh balanceada.
+
